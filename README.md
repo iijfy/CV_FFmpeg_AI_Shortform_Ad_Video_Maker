@@ -1,6 +1,7 @@
 ✅ [데모 결과물 클릭](https://vimeo.com/1159512235?share=copy&fl=sv&fe=ci)
 
-![예시 이미지](example.png)
+![예시 이미지](example.png
+![데모](assets/demo.gif)
 
 # 🎬 AI 유튜브 숏폼 광고영상 제작 프로그램 (MVP)
 
