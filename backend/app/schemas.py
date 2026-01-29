@@ -1,11 +1,3 @@
-"""
-Pydantic 스키마
-
-왜 스키마가 필요한가?
-- FastAPI는 타입힌트/스키마로 요청/응답을 자동 문서화(Swagger) 해줍니다.
-- 프론트/백엔드 사이 계약(Contract)이 명확해져서 협업이 쉬워집니다.
-"""
-
 from pydantic import BaseModel, Field
 
 class GenerateResponse(BaseModel):

@@ -1,14 +1,3 @@
-"""TTS 서비스
-
-요구사항(지금까지 합의된 것)
-- OPENAI_API_KEY가 없어도 "무조건" 음성이 나와야 한다.
-  - macOS: 기본 내장 `say`로 생성(오프라인 가능)
-  - OpenAI 키가 있으면 OpenAI TTS를 사용
-
-중요 포인트
-- Streamlit/FASTAPI를 Python 3.9로 돌려도 깨지지 않게 type annotation은 Optional로 쓴다.
-"""
-
 from __future__ import annotations
 
 import os
@@ -35,10 +24,11 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
 
 
 def _macos_say(text: str, out_mp3: Path) -> Optional[Path]:
-    """macOS 내장 say로 MP3 생성
+    """
+    macOS 내장 say로 MP3 생성
 
     - say는 AIFF/CAF 쪽이 안정적이라 일단 aiff로 뽑고
-    - ffmpeg로 mp3로 변환한다.
+    - ffmpeg로 mp3로 변환
     """
     if not text.strip():
         return None
@@ -46,8 +36,8 @@ def _macos_say(text: str, out_mp3: Path) -> Optional[Path]:
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
     tmp_aiff = out_mp3.with_suffix(".aiff")
 
-    # 말 빠르기: say는 -r로 WPM(대략) 조절
-    # 경험상 180~220이 쇼츠 느낌이 잘 남.
+    # 말 빠르기: say는 -r로 WPM 조절
+    # 180~220이 쇼츠 느낌이 잘 난다고 하여 200 기준
     wpm = int(200 * float(settings.TTS_SPEED))
     voice = settings.TTS_VOICE or "Yuna"
 
@@ -117,7 +107,7 @@ def _openai_tts(text: str, out_mp3: Path) -> Optional[Path]:
         "voice": settings.OPENAI_TTS_VOICE,
         "input": text,
         "format": "mp3",
-        # ✅ 광고 쇼츠 톤: 빠르고 끊어읽기, 군더더기 없는 호흡
+        # 광고 쇼츠 톤: 빠르고 끊어읽기, 군더더기 없는 호흡
         "instructions": "Speak fast and energetic like a short-form ad. Minimal pauses. Clear diction.",
     }
 
@@ -130,7 +120,8 @@ def _openai_tts(text: str, out_mp3: Path) -> Optional[Path]:
 
 
 def synthesize_voice(text: str, out_mp3: Path) -> Optional[Path]:
-    """텍스트 -> 음성(mp3)
+    """
+    텍스트 -> 음성(mp3)
 
     동작 규칙
     1) OPENAI_API_KEY가 있으면 OpenAI TTS 사용
@@ -150,12 +141,10 @@ def synthesize_voice(text: str, out_mp3: Path) -> Optional[Path]:
     return None
 
 
-# backend/app/services/tts.py
-
 from typing import List, Tuple
 
 def _ffprobe_duration_sec(path: Path) -> float:
-    """mp3 실제 길이(초) 측정 - 자막 싱크의 기준이 됨"""
+    # mp3 실제 길이(초) 측정 - 자막 싱크의 기준이 됨
     ffprobe = os.getenv("FFPROBE_BIN", "ffprobe")
     cmd = [
         ffprobe, "-v", "error",
@@ -176,7 +165,7 @@ def _postprocess_voice(in_mp3: Path, out_mp3: Path, speed: float = 1.10) -> Path
     """
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
 
-    # ⚠️ atempo는 0.5~2.0 범위만 안전
+    # atempo는 0.5~2.0 범위만 안전
     speed = max(0.8, min(1.4, float(speed)))
 
     af = ",".join([
@@ -226,7 +215,7 @@ def synthesize_voice_lines(
             # 1) TTS 생성
             tts_out = synthesize_voice(line, raw)
 
-            # ✅ 핵심: TTS가 None이거나 파일이 안 생기면 이 줄은 스킵
+            # 핵심: TTS가 None이거나 파일이 안 생기면 이 줄은 스킵
             if (tts_out is None) or (not raw.exists()) or (raw.stat().st_size < 1000):
                 logger.warning("TTS line_%02d 생성 실패/무음 (OS=%s, key=%s) → 스킵",
                                i, platform.system(), bool(settings.OPENAI_API_KEY))
@@ -235,7 +224,7 @@ def synthesize_voice_lines(
             # 2) 후처리(무음 제거/속도/정규화)
             _postprocess_voice(raw, part, speed=speed_up)
 
-            # ✅ 후처리 결과 파일 체크
+            # 후처리 결과 파일 체크
             if (not part.exists()) or (part.stat().st_size < 1000):
                 logger.warning("TTS line_%02d 후처리 결과가 비정상 → 스킵", i)
                 continue
@@ -253,7 +242,7 @@ def synthesize_voice_lines(
             logger.warning("TTS line_%02d 처리 중 예외 → 스킵: %s", i, e)
             continue
 
-    # ✅ 아무 파트도 없으면: '명확한 원인 로그'를 남기고 무음으로 반환(파이프라인은 유지)
+    # 아무 파트도 없으면: '명확한 원인 로그'를 남기고 무음으로 반환(파이프라인은 유지)
     if not parts:
         logger.error(
             "TTS 결과가 0개입니다. (OS=%s, OPENAI_API_KEY=%s) "

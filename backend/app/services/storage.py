@@ -1,10 +1,3 @@
-"""
-스토리지 유틸
-
-MVP에서는 로컬 디스크에 저장하지만,
-나중에 GCS/S3로 바꾸기 쉬우라고 '한 곳'에 모아둡니다.
-"""
-
 from __future__ import annotations
 import os
 import uuid
@@ -21,5 +14,5 @@ def make_job_dir() -> Path:
     return job_dir
 
 def public_video_path(job_dir: Path) -> Path:
-    # 결과 영상은 job_dir/artifacts/final.mp4 로 고정 (규칙!)
+    # 결과 영상은 job_dir/artifacts/final.mp4 로 고정
     return job_dir / "artifacts" / "final.mp4"

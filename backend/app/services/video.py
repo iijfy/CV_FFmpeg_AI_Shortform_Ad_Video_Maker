@@ -1,15 +1,13 @@
 """
-영상 생성(FFmpeg)
+영상 생성 - FFmpeg
 
 핵심 아이디어:
 - 업로드한 여러 장의 사진을 9:16 슬라이드 쇼로 만들고
-- 자막을 drawtext(항상 동작)로 burn-in 하고
-- (선택) 음성(TTS) + BGM을 믹싱해서
-- 최종 15초 mp4를 만든다.
-
-현업 팁:
-- moviepy로도 가능하지만, 안정성/속도/호환성은 FFmpeg가 훨씬 좋습니다.
-- 그래서 "FFmpeg 커맨드를 만들고 실행"하는 구조로 갑니다.
+- 자막을 drawtext로 burn-in 하고
+- BGM을 믹싱해서
+- 최종 18초 mp4를 만든다.
+- moviepy로도 가능하지만, 안정성/속도/호환성은 FFmpeg가 훨씬 좋다고 하여 선택함
+- 그래서 "FFmpeg 커맨드를 만들고 실행"하는 구조로 만듬
 """
 
 from __future__ import annotations
@@ -28,8 +26,6 @@ from pathlib import Path
 
 logger = get_logger(__name__)
 
-# ✅ conda ffmpeg를 고정하고 싶으면 환경변수로 지정 가능
-# 예) FFMPEG_BIN=/usr/local/Caskroom/miniforge/base/bin/ffmpeg
 FFMPEG_BIN = os.getenv("FFMPEG_BIN", "ffmpeg")
 
 # ffprobe도 같은 prefix를 쓰도록 맞추기
@@ -40,16 +36,12 @@ else:
 
 
 def _project_root() -> Path:
-    """
-    이 파일 기준으로 프로젝트 루트를 잡습니다.
-    예: .../AI_Shortform_Ad_Video_Maker_MVP/backend/app/services/video.py
-    parents[0]=services, [1]=app, [2]=backend, [3]=프로젝트 루트
-    """
+   
     return Path(__file__).resolve().parents[3]
 
 
 def _run(cmd: list[str]):
-    """FFmpeg 실행 유틸 (실패 시 stderr 포함)"""
+    # FFmpeg 실행 유틸
     logger.info("FFmpeg 실행: %s", " ".join(cmd))
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
@@ -58,7 +50,7 @@ def _run(cmd: list[str]):
 
 
 def get_audio_duration_sec(audio_path: Path) -> float:
-    """ffprobe로 오디오 길이(초) 측정"""
+    # ffprobe로 오디오 길이(초) 측정
     cmd = [
         FFPROBE_BIN,
         "-v", "error",
@@ -73,7 +65,7 @@ def get_audio_duration_sec(audio_path: Path) -> float:
 
 
 def _escape_drawtext(s: str) -> str:
-    """drawtext 필터 문자열이 깨지지 않도록 최소 escape"""
+    # drawtext 필터 문자열이 깨지지 않도록 최소 escape
     s = s.replace("\\", "\\\\")
     s = s.replace(":", "\\:")
     s = s.replace("'", "\\'")
@@ -82,7 +74,7 @@ def _escape_drawtext(s: str) -> str:
 
 
 def _pick_y_by_anchor_name(anchor_name: str) -> str:
-    """top/mid/bottom에 따라 y 위치를 정한다."""
+    # top/mid/bottom에 따라 y 위치를 정함
     if anchor_name == "top":
         return "h*0.12"
     if anchor_name == "mid":
@@ -92,17 +84,17 @@ def _pick_y_by_anchor_name(anchor_name: str) -> str:
 
 def _effect_zoompan(i: int) -> str:
     """
-    ✅ 안전한 zoompan 프리셋 (ffmpeg expr에서 on/d 같은 변수 사용 X)
+    안전한 zoompan 프리셋 (ffmpeg expr에서 on/d 같은 변수 사용 X)
 
     - zoompan 내부에서 프레임 인덱스/길이(d)를 나눗셈으로 쓰면
       ffmpeg 버전에 따라 'd' 파싱 문제가 나서 깨질 수 있음.
-    - 그래서 "좌표를 고정"하거나 "간단한 식"만 사용한다.
+    - 그래서 "좌표를 고정"하거나 "간단한 식"만 사용
 
     리턴값: "zoompan=..." 전체 문자열
     """
     k = i % 4
 
-    # 공통: 프레임 누적 줌인 (쇼츠 느낌)
+    # 공통: 프레임 누적 줌인 (쇼츠 느낌나게)
     # zoom은 내부 상태로 누적되므로 zoom+... 형태가 안정적
     z_fast = "z='min(zoom+0.0040,1.20)'"
     z_slow = "z='min(zoom+0.0030,1.16)'"
@@ -127,16 +119,16 @@ def _effect_zoompan(i: int) -> str:
 
 def build_slideshow(images: list[Path], out_video: Path) -> Path:
     """
-    이미지 -> 무음 슬라이드쇼 mp4 생성 (길이=VIDEO_SECONDS)
+    이미지 -> 무음 슬라이드쇼 mp4 생성
 
     포인트
-    - images 개수(n)로 15초를 균등 분할
+    - images 개수로 18초를 균등 분할
     - 각 컷마다 zoompan 모션을 다르게 줘서 지루함 줄임
     - scale/pad/setsar로 입력 포맷이 달라도 concat 안정화
     """
     out_video.parent.mkdir(parents=True, exist_ok=True)
 
-    total = float(settings.VIDEO_SECONDS)  # 기본 15초
+    total = float(settings.VIDEO_SECONDS)  # 기본 18초
     fps = 30
     n = max(1, len(images))
     per = total / n
@@ -154,8 +146,7 @@ def build_slideshow(images: list[Path], out_video: Path) -> Path:
     # 2) 각 이미지별 필터 체인 생성 (핵심: motion은 i로부터 만든다)
     filters: list[str] = []
     for i, _img in enumerate(images):
-        motion = _effect_zoompan(i)  # ✅ 이 한 줄이 없어서 NameError 났던 거
-
+        motion = _effect_zoompan(i)  
         filters.append(
             f"[{i}:v]"
             f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -196,7 +187,7 @@ def burn_text_overlays(
     image_paths: list[Path],
     lines: list[str],
     out_video: Path,
-    timings: Optional[List[Tuple[float, float]]] = None,  # ✅ routes.py에서 timings= 로 넘겨야 함
+    timings: Optional[List[Tuple[float, float]]] = None, 
 ) -> Path:
     """
     libass 없이도 항상 동작하는 drawtext 자막
@@ -217,11 +208,11 @@ def burn_text_overlays(
 
     anchors = pick_anchors_for_images(image_paths)[:n]
 
-    # ✅ 실행 위치 상관없이 안정적으로 폰트 찾기
+    # 실행 위치 상관없이 안정적으로 폰트 찾기
     fontfile_path = (_project_root() / "assets" / "fonts" / "BMHANNAPro.ttf").resolve()
-    fontfile = str(fontfile_path)  # ✅ ffmpeg에는 str로!
+    fontfile = str(fontfile_path)  # ffmpeg에는 str로 넘거야 함
 
-    # ✅ 자막 스타일: settings에서 읽기
+    # 자막 스타일: settings에서 읽기
     fontsize = int(getattr(settings, "CAPTION_FONT_SIZE", 104))
     borderw = int(getattr(settings, "CAPTION_BORDER_W", 12))
     box_alpha = float(getattr(settings, "CAPTION_BOX_ALPHA", 0.35))
@@ -244,27 +235,27 @@ def burn_text_overlays(
             f"fontfile='{fontfile}':"
             f"text='{txt}':"
 
-            # ✅ 폰트 크게
+            # 폰트 
             f"fontsize={fontsize}:"
 
 
-            # ✅ 글자 색/테두리/그림자 (가독성)
+            # 글자색/테두리/그림자 
             "fontcolor=white:"
             f"borderw={borderw}:"
             "bordercolor=black:"
             "shadowx=3:shadowy=3:shadowcolor=black@0.7:"
 
-            # ✅ 쇼츠 국룰: 반투명 박스(배경) 깔기
+            # 반투명 박스배경 깔기
             "box=1:"
             f"boxcolor=black@{box_alpha}:"
             f"boxborderw={boxborder}:"
 
 
-            # ✅ 위치: 가운데 정렬
+            # 위치: 가운데 정렬
             "x=(w-text_w)/2:"
             f"y={y_expr}:"
 
-            # ✅ 타이밍
+            # 타이밍
             f"enable='between(t,{start:.2f},{end:.2f})'"
         )
 
@@ -294,7 +285,7 @@ def mix_audio(
     out_video: Path,
 ) -> Path:
     """
-    ✅ 최종 길이를 항상 settings.VIDEO_SECONDS로 고정 + BGM 덕킹(목소리 나오면 BGM 자동으로 내려감)
+    최종 길이를 항상 settings.VIDEO_SECONDS로 고정 + BGM 덕킹(목소리 나오면 BGM 자동으로 내려감)
 
     - voice가 짧아도: apad + atrim으로 total 길이 맞춤
     - bgm은 loop 후 total로 자름
@@ -321,13 +312,11 @@ def mix_audio(
     filter_parts: list[str] = []
     idx = 1  # 0은 video 입력
 
-    # -------------------------
+    
     # Voice chain
-    # -------------------------
     if has_voice:
         cmd += ["-i", str(voice_path)]
-        # voice는 이미 tts.py에서 loudnorm/atempo 처리했지만,
-        # 여기서 마지막으로 길이/pts만 안전하게 고정
+    
         filter_parts.append(
             f"[{idx}:a]"
             f"volume=1.0,"
@@ -338,9 +327,8 @@ def mix_audio(
         )
         idx += 1
 
-    # -------------------------
+    
     # BGM chain
-    # -------------------------
     if has_bgm:
         cmd += ["-stream_loop", "-1", "-i", str(bgm_path)]
         # bgm 볼륨은 덕킹 전 기준값. 너무 크면 덕킹해도 거슬림.
@@ -353,19 +341,15 @@ def mix_audio(
         )
         idx += 1
 
-    # -------------------------
+    
     # Mix / Ducking
-    # -------------------------
     if has_voice and has_bgm:
-        # ✅ 핵심: sidechaincompress
-        # - bgm(a_bgm)을 voice(a_voice)로 감시해서
-        #   voice가 커지면 bgm을 자동으로 눌러줌
-        #
+        # 핵심: sidechaincompress
         # 파라미터 감각:
-        # threshold: 덕킹 시작 기준(낮을수록 자주 덕킹)
-        # ratio: 눌리는 강도(10~20이면 광고 느낌으로 확실함)
-        # attack: 내려가는 속도(빠를수록 '딱' 내려감)
-        # release: 다시 올라오는 속도(너무 짧으면 펌핑, 너무 길면 답답)
+        # - threshold: 덕킹 시작 기준(낮을수록 자주 덕킹)
+        # - ratio: 눌리는 강도(10~20이면 광고 느낌으로 확실함)
+        # - attack: 내려가는 속도(빠를수록 '딱' 내려감)
+        # - release: 다시 올라오는 속도(너무 짧으면 펌핑, 너무 길면 답답)
         filter_parts.append(
             "[a_bgm][a_voice]"
             "sidechaincompress="
@@ -397,7 +381,6 @@ def mix_audio(
         "-map", "[a_out]",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        # 웹에서 빨리 재생 시작되게(체감 큼)
         "-movflags", "+faststart",
         "-t", str(total),
         str(out_video),

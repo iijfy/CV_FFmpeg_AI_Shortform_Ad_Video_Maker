@@ -54,7 +54,6 @@ def _normalize_for_tts(s: str) -> str:
 def _safe_segments() -> int:
     """
     settings.VIDEO_SEGMENTS가 없거나 이상한 값이면 6으로 안전하게 보정
-    (쇼츠 템포 기본값: 15초 / 6컷 = 2.5초/컷)
     """
     try:
         v = int(getattr(settings, "VIDEO_SEGMENTS", 6))
@@ -71,15 +70,15 @@ async def generate(
     store_name: str = Form("", description="가게 이름(선택)"),
     tone: str = Form("감성", description="광고 톤(힙/감성/고급/가성비)"),
 
-    # ✅ 추가 입력(선택)
+    # 추가 입력(선택)
     price: str = Form("", description="가격(선택)"),
     location: str = Form("", description="위치(선택)"),
     benefit: str = Form("", description="혜택(선택)"),
     cta: str = Form("", description="콜투액션(선택)"),
 ):
-    # -------------------------
+   
+
     # 0) 입력 검증
-    # -------------------------
     if len(images) < 1:
         raise HTTPException(400, "이미지를 1장 이상 업로드해주세요.")
     if not (menu_name or "").strip():
@@ -94,16 +93,14 @@ async def generate(
     benefit = (benefit or "").strip() or None
     cta = (cta or "").strip() or None
 
-    # -------------------------
+
     # 1) 작업 디렉토리 생성
-    # -------------------------
     job_dir = make_job_dir()
     inputs_dir = job_dir / "inputs"
     artifacts_dir = job_dir / "artifacts"
 
-    # -------------------------
+    
     # 2) 이미지 저장
-    # -------------------------
     img_paths: list[Path] = []
     for i, uf in enumerate(images, start=1):
         suffix = Path(uf.filename).suffix.lower() or ".jpg"
@@ -111,17 +108,15 @@ async def generate(
         save_path.write_bytes(await uf.read())
         img_paths.append(save_path)
 
-    # -------------------------
+
     # 3) 쇼츠 템포용 컷 수 확정
-    # -------------------------
     target_cuts = _safe_segments()
 
     # 이미지가 적으면 반복해서 컷 수 맞춤 (템포 유지)
     image_paths_for_video = [img_paths[i % len(img_paths)] for i in range(target_cuts)]
 
-    # -------------------------
+ 
     # 4) LLM 카피 생성 (컷 수 = 캡션 줄 수)
-    # -------------------------
     llm_out = generate_copy(
         menu_name=menu_name,
         store_name=store_name,
@@ -137,7 +132,7 @@ async def generate(
     if len(caption_lines) < target_cuts:
         caption_lines += [""] * (target_cuts - len(caption_lines))
 
-    # ✅ 빈 줄 제거 (자막/내레이션 둘 다 깔끔)
+    # 빈 줄 제거 (자막/내레이션 둘 다 깔끔)
     caption_lines_clean = [_normalize_for_tts(s) for s in caption_lines if s and s.strip()]
 
 
@@ -146,36 +141,31 @@ async def generate(
         fallback = _normalize_for_tts(llm_out.promo_text) if getattr(llm_out, "promo_text", "") else ""
         caption_lines_clean = [fallback] if fallback else ["지금 바로 방문해보세요!"]
 
-   # ✅ (추가) 프론트에 보여줄 전체 카피 텍스트(복사/공유용)
+   # 프론트에 보여줄 전체 카피 텍스트(복사/공유용)
     tts_text = "\n".join(caption_lines_clean)
 
-    # -------------------------
+
     # 5) TTS (줄별 생성 → 싱크 정확)
-    # -------------------------
     voice_path = None
     timings = None
 
 
-    # -------------------------
-    # 6) 슬라이드쇼(무음) 생성: 항상 15초
-    # -------------------------
+   
+    # 6) 슬라이드쇼(무음) 생성: 항상 18초
     silent_video = build_slideshow(image_paths_for_video, artifacts_dir / "silent.mp4")
 
 
-    # -------------------------
+
     # 8) drawtext로 자막 burn-in
-    # -------------------------
     sub_video = burn_text_overlays(
         in_video=silent_video,
         image_paths=image_paths_for_video,
         lines=caption_lines_clean,
         out_video=artifacts_dir / "subtitled.mp4",
-        timings=timings,  # ✅ video.py와 시그니처 맞춤
+        timings=timings,  # video.py와 맞춤
     )
 
-    # -------------------------
     # 9) BGM 선택: 실행 위치 상관없이 프로젝트 루트 기준
-    # -------------------------
     bgm_dir = _project_root() / "assets" / "bgm"
     bgm_candidates = list(bgm_dir.glob("*.mp3")) + list(bgm_dir.glob("*.wav"))
     bgm_path = bgm_candidates[0] if bgm_candidates else None
@@ -189,15 +179,13 @@ async def generate(
     bool(bgm_path and Path(bgm_path).exists()),
     )
 
-    # -------------------------
+ 
     # 10) 오디오 믹스해서 최종 mp4
-    # -------------------------
     final_path = mix_audio(sub_video, None, bgm_path, public_video_path(job_dir))
 
 
-    # -------------------------
+
     # 11) 결과 반환
-    # -------------------------
     job_id = job_dir.name
     video_url = f"/outputs/{job_id}/artifacts/final.mp4"
 

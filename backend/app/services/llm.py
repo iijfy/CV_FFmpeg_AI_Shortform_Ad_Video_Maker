@@ -1,14 +1,14 @@
 """
-LLM 서비스 (선택)
+LLM 
 
 역할:
 - 메뉴/가게명/톤(+ 옵션 정보)를 받아서
-  - 15초 쇼츠용 캡션 4~12줄 (보통 6줄 추천)
+  - 18초 쇼츠용 캡션 8~10줄
   - 3~5문장 프로모션 문구
   - 해시태그 5~12개
 를 생성.
 
-옵션 A 목표(정보전달 포함):
+목표(정보전달 포함):
 - 유튜브 쇼츠처럼 "훅 → 정보 → 신뢰 → 혜택 → 긴급/한정 → CTA" 흐름을 갖게 한다.
 - 과장/허위 효능/의학적 주장 금지.
 - LLM 키가 없어도 fallback이 '허접'하지 않게 템플릿을 강화한다.
@@ -35,9 +35,7 @@ class LLMOutput:
     hashtags: List[str]
 
 
-# -----------------------------
 # 유틸
-# -----------------------------
 def _clean(s: Optional[str]) -> Optional[str]:
     if s is None:
         return None
@@ -164,9 +162,8 @@ def _hashtags(menu_name: str, store_name: Optional[str], location: Optional[str]
     return out
 
 
-# -----------------------------
-# ✅ 이모지(절제) - fallback에만 사용
-# -----------------------------
+
+# 이모지(절제) - fallback에만 사용
 def _emoji_pool(tone: str) -> List[str]:
     t = (tone or "감성").strip()
     if t in ["힙", "힙합", "스트릿"]:
@@ -180,7 +177,7 @@ def _emoji_pool(tone: str) -> List[str]:
 
 def _looks_like_info_line(s: str) -> bool:
     """
-    ✅ 가격/위치/혜택 같은 '정보 줄' 판별
+    가격/위치/혜택 같은 '정보 줄' 판별
     - 이런 줄엔 이모지를 붙이면 유치해 보일 확률이 높아서 금지
     """
     s = (s or "").strip()
@@ -204,7 +201,7 @@ def _looks_like_info_line(s: str) -> bool:
 
 def _add_emojis_fallback(lines: List[str], tone: str, max_emojis: int = 2) -> List[str]:
     """
-    ✅ fallback 전용: 이모지를 '딱' 몇 줄에만 추가
+    fallback 전용: 이모지를 '딱' 몇 줄에만 추가
     룰:
     - 줄당 최대 1개
     - 전체 max_emojis개만
@@ -240,9 +237,8 @@ def _add_emojis_fallback(lines: List[str], tone: str, max_emojis: int = 2) -> Li
     return out
 
 
-# -----------------------------
+
 # fallback (키 없을 때도 "괜찮게")
-# -----------------------------
 def _fallback(
     menu_name: str,
     store_name: Optional[str],
@@ -260,7 +256,7 @@ def _fallback(
     hook = tonep["hook"][0]  # 톤 프로필의 훅
     cta_text = cta or random.choice(bank["cta"])
 
-    # ✅ 정보는 한 줄에 1개만
+    # 정보는 한 줄에 1개만
     if price:
         info = f"{price}면 끝"
     elif benefit:
@@ -294,10 +290,10 @@ def _fallback(
             lines.insert(-1, fillers[k % len(fillers)])
             k += 1
 
-    # ✅ 길이 캡
+    # 길이 캡
     lines = [_cap_len(_normalize_line(x), 16) for x in lines]
 
-    # ✅ fallback에만 절제 이모지 추가(최대 2개)
+    # fallback에만 절제 이모지 추가(최대 2개)
     lines = _add_emojis_fallback(lines, tone, max_emojis=2)
 
     promo_parts = [
@@ -313,9 +309,8 @@ def _fallback(
     return LLMOutput(lines, promo, tags)
 
 
-# -----------------------------
+
 # OpenAI 호출 (있으면 더 자연스럽게)
-# -----------------------------
 def _parse_json_safely(text: str) -> Optional[dict]:
     """
     모델이 JSON 외 텍스트를 섞어도 최대한 복구하는 파서
@@ -423,9 +418,9 @@ def generate_copy(
 
 
 [이모지 규칙]
-- ✅ 캡션 전체에 이모지는 "정확히 1개"만 사용해라.
-- ✅ 그 1개는 "첫 줄(훅)"에만 붙여라.
-- ✅ 사용 가능한 이모지: 🔥 ⭐️ 🍜 🍖 🥟 🍣 🧀 🥩 🌶️
+- 캡션 전체에 이모지는 "정확히 1개"만 사용해라.
+- 그 1개는 "첫 줄(훅)"에만 붙여라.
+- 사용 가능한 이모지: 🔥 ⭐️ 🍜 🍖 🥟 🍣 🧀 🥩 🌶️
 - 다른 이모지 금지.
 
 [전개 템플릿]

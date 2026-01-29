@@ -1,8 +1,9 @@
-"""설정 로더
+"""
+설정 로더
 
 목표
 - Python 3.9+에서도 문제 없이 돌아가게(= `str | None` 같은 3.10+ 문법 금지)
-- .env가 좀 지저분해도(옛 키들 포함) 깨지지 않게(extra ignore)
+- .env가 좀 지저분해도, 깨지지 않게(extra ignore)
 """
 
 from __future__ import annotations
@@ -42,8 +43,6 @@ class Settings(BaseSettings):
     OPENAI_TTS_VOICE: str = "shimmer"
 
     # (2) 로컬(macOS say)을 쓸 때의 voice
-    # - 예: "Yuna", "Sora" 등 (시스템에 설치된 음성)
-    # - 예전 .env에서 tts_voice 로 쓰던 값도 같은 의미로 받아줌
     TTS_VOICE: str = Field(default="Yuna", validation_alias="tts_voice")
 
     # 말하기 속도(1.0=기본). 예전 .env에서 tts_speed 로 쓰던 값도 받아줌

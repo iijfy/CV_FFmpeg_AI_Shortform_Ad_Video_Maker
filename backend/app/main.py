@@ -6,7 +6,7 @@ FastAPI 엔트리포인트
 
 왜 정적 서빙?
 - MVP에서는 DB나 Object Storage 없이도,
-  생성된 파일을 바로 URL로 보여주면 데모가 매우 쉬워집니다.
+  생성된 파일을 바로 URL로 보여주면 데모가 쉬워지기 때문
 """
 
 from fastapi import FastAPI
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 app = FastAPI(title="AI Shortform Ad Video Maker", version="0.1.0")
 
-# CORS: Streamlit(8501)에서 FastAPI(8000) 호출할 거라 열어둠
+# CORS: Streamlit(8502)에서 FastAPI(8000) 호출할 거라 열어둠
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,8 +33,7 @@ app.add_middleware(
 
 app.include_router(api_router)
 
-# outputs 폴더를 /outputs 로 서빙
-# ✅ 폴더가 없으면 FastAPI가 시작부터 죽기 때문에(Starlette StaticFiles), 미리 생성해둔다.
+# 폴더가 없으면 FastAPI가 시작부터 죽기 때문에 미리 생성해둔다.
 Path(settings.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
