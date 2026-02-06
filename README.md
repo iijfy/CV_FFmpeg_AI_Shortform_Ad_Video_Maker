@@ -93,6 +93,9 @@ uvicorn backend.app.main:app --reload --port 8000
 
 # Streamlit (프로젝트 구조에 맞게)
 streamlit run frontend/app.py
+
+# 통합 실행
+python run.py
 ```
 
 ---
