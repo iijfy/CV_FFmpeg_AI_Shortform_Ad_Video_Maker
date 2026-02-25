@@ -146,3 +146,7 @@ promo_text
 2) WEBP Exif 경고 (invalid TIFF header)
 - 일부 WEBP에 Exif가 깨져있는 경우 뜨는 경고
 - 대체로 치명적이진 않지만, 안정성을 위해 JPG/PNG로 변환하거나 pillow로 리세이브하는 전처리를 둘 수 있습니다.
+
+## 보고서 & 협업일지
+김모건 "report" 이름으로 깃허브에세 확인바랍니다.
+김모건 https://www.notion.so/_-_-2c4068e43a16802d9ae1fb419238aaac?source=copy_link
